@@ -2,6 +2,7 @@
 /dist/
 /artifacts/
 /private/
+/Screenshots.zip
 /.venv/
 /.cache/
 *.log
