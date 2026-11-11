@@ -1,53 +1,89 @@
-# 本地安卓设备接入补丁
+# UU Remote Patch
 
-目标是让本地安卓设备通过现有远程软件的模拟器入口显示和操作，沿用现有客户端、账号及中继。
+让本地 ADB 设备出现在 UU 远程的模拟器列表里，像操作 MuMu 一样操作手机、平板或 redroid，继续使用 UU 官方客户端和中继。
 
-官方手机端已确认首个修正版能显示新增设备和画面，但反馈预览偏色、偶发连接错误、导航键不可用、强制竖屏和切换手势不可用。第二修订针对这些问题完成修改与独立检查，并在用户重启电脑后于 2026 年 11 月 11 日约 19:17（本机时间）正式加载；用户本轮复测确认五项正常，另报告打开多开管理界面时画面会闪一下。该现象的原因尚未定位，详细记录见 docs/验证记录.md（验证记录）。
+## 截图
 
-第二修订仍以临时内存方式运行，原候选归档保持原样。用户之后要求简单配置、可供其他电脑使用且重启后保留；新增部署候选采用被控端目录的系统版本库代理，安装时复制运行依赖并使用相对路径。独立自动加载和隔离安装检查已通过，正式后台重启后的效果尚待确认。安装步骤见 docs/部署使用说明.md（分发包使用说明），当前决定见 docs/续接记录.md（续接记录）。
+![四台 redroid 出现在 UU 远程多开管理中](docs/images/multi-instance.jpg)
 
-补丁运行在电脑被控端。设备管理、画面采集和触控转发由本地适配代码完成，远程传输继续使用原程序。目前仅核对官方后台 4.46.0.4716 的三个精确二进制摘要；其他版本不能直接使用。
+## 用法
 
-开发时使用系统已有的编译器和构建工具。构建产物、设备配置和运行记录分别放在被版本控制忽略的目录中，避免提交设备地址或敏感信息。
+### 准备
 
-## 配置与构建
+- Windows x64，UU 被控端 **4.46.0.4716**。目前只适配这一构建，补丁会核对官方文件，其他版本不会启用。
+- 下载本项目的部署包，再下载 [scrcpy 5.0.1 Windows x64](https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1)。scrcpy 的依赖需要自己准备。
+- 设备开启 ADB 调试并完成授权；无线调试先完成配对。
 
-复制 config.example.json（配置示例）为 config.local.json（本地配置），填写调试桥程序和投屏组件目录；相对路径以配置所在目录为起点。默认可使用投屏组件自带的调试桥；网络设备填入 connect（网络重连列表），数据线设备无需填写。当前组件要求 scrcpy（安卓投屏组件）5.0.1、avcodec（视频解码库）63 和 avutil（多媒体工具库）61；这些程序不包含在源码中。
+### 放进去
+
+1. 解压部署包，把 scrcpy 压缩包里的文件放进 `uu-adb-patch/runtime/scrcpy/`，不要多套一层目录。里面应能直接找到 `adb.exe`、`scrcpy-server`、`avcodec-63.dll` 和 `avutil-61.dll`。
+2. 打开 `uu-adb-patch/config.local.json`。USB 设备一般不用改；网络设备在 `connect` 中填写地址和端口，例如 `"connect": ["192.0.2.1:5555"]`，把示例地址换成自己的。
+3. 把 **`version.dll` 和整个 `uu-adb-patch` 文件夹**复制到 UU 的 `bin` 目录，与 `GameViewerServer.exe` 放在一起。默认位置是 `C:/Program Files/Netease/GameViewer/bin`，写入这个目录通常需要管理员权限。
+4. 重启 UU 被控端或电脑，手机重新打开多开管理，就能看到 ADB 设备。
+
+最后的目录大致这样：
+
+```text
+bin/
+├─ GameViewerServer.exe       # UU 原有文件
+├─ version.dll               # 补丁入口
+└─ uu-adb-patch/
+   ├─ config.local.json      # 设备和画面设置
+   ├─ runtime/scrcpy/        # 自己准备的 scrcpy 文件
+   ├─ README.md
+   ├─ THIRD_PARTY.md
+   ├─ licenses/
+   └─ manifest.json
+```
+
+配置默认使用相对路径，也可以指向已有的 ADB 和 scrcpy 目录。网络设备会按 `connect` 尝试重连。修改配置后需要重启后台；之后只要 UU 正常启动，补丁就会一起加载。
+
+**重启被控端会断开远程连接。** 如果正在通过 UU 操作电脑，先留好重新连接的方式。安装目录已有同名 DLL 或旧补丁时，先退出后台并备份，别直接覆盖。
+
+### 拿出来
+
+退出 UU 后台，把 `version.dll` 改名为 `version.dll.disabled`，或移到安装目录之外，再启动 UU。配置和依赖可以保留；需要恢复时把 DLL 放回原位。
+
+正在运行的补丁不能热卸载，只关客户端窗口也不一定退出后台。补丁不修改官方程序，不另建服务或计划任务；UU 更新后可能需要重新适配。
+
+## 作用
+
+- 在原模拟器列表后追加 ADB 设备，保留原来的 MuMu 实例。
+- 显示多开预览和设备画面，转发触控与返回、主页、最近任务操作。
+- 支持横屏及手机端上下滑动切换设备，不需要修改手机 APK。
+
+当前已在手机端确认上述主要功能。打开多开管理时，预览仍可能短暂退回占位图；多指和长期稳定性尚未专项验证。新的复制部署方式已做独立检查，正式后台重启后的接入还等实测。
+
+## 构建
+
+需要 Visual Studio C++ x64 工具链和 CMake。下面以 Visual Studio 2026 为例：
 
 ```powershell
-cmake -S . -B build/portable -G 'Visual Studio 18 2026' -A x64
+cmake -S . -B build/portable -G "Visual Studio 18 2026" -A x64
 cmake --build build/portable --config Release
 ctest --test-dir build/portable -C Release --output-on-failure
 ```
 
-上面使用 CMake（构建工具）及微软六十四位编译器。六个自动检查覆盖多指包、共享纹理、系统代理、两次独立启动的代理自动加载，以及相对路径、中文目录和模拟调试桥重连。代理检查会创建八个六十四千字节栈的线程，覆盖此前崩溃条件。
+生成的补丁在 `build/portable/Release/version.dll`。提交源码后，用 PowerShell 7 运行 `./tools/package.ps1`，部署包生成在 `dist/`；包内只有 DLL、默认配置、简短说明和许可材料，不含开发文档、截图、注入工具或运行依赖。
 
-只读设备检查与管理接口检查需要本地配置，不在普通构建中自动运行：
+## 文档
 
-```powershell
-./build/portable/Release/bridge_check.exe device
-./build/portable/Release/management_check.exe 'C:/Program Files/Netease/GameViewer/bin/nemu-api.dll' 'D:/Program Files/MuMuPlayer' video
-```
+| 文档 | 内容 |
+| --- | --- |
+| [部署说明](docs/部署使用说明.md) | 配置、依赖、停用和排查 |
+| [实现详解](docs/实现详解.md) | 工作原理与逐行源码说明 |
+| [手机端兼容修复](docs/手机端兼容修复.md) | 颜色、方向、导航和预览闪烁 |
+| [验证记录](docs/验证记录.md) | 实际通过的检查和剩余问题 |
+| [接入调查](接入调查.md) | 接口依据与参考项目 |
+| [续接记录](docs/续接记录.md) | 开发状态和历史候选位置 |
 
-设备检查会上传安卓服务文件、建立本机转发并读取画面，不发送触控。管理检查只在独立进程调用接口，不加载到正式后台；核对管理接口、同设备独立句柄及退役句柄。末尾 video（视频检查）参数额外运行三轮双通道只读连接、预览、回调重入和独立销毁。
+## 致谢
 
-## 加载与停用
+- [scrcpy](https://github.com/Genymobile/scrcpy)：ADB 画面采集与控制协议。
+- [MinHook](https://github.com/TsudaKageyu/minhook)、[nlohmann/json](https://github.com/nlohmann/json)、[FFmpeg](https://github.com/FFmpeg/FFmpeg)：挂接、配置解析和视频解码。
+- [uu-enhance](https://github.com/djkcyl/uu-enhance)、[better-gameviewer](https://github.com/std-microblock/better-gameviewer)：已有 UU 补丁的思路参考。
+- [Antigravity-Proxy](https://github.com/yuaotian/antigravity-proxy)：目录复制部署方式与 README 写法参考。
 
-tools/install.ps1（安装管理脚本）默认只查状态；显式安装会核对官方摘要，再复制代理、配置与依赖，下一次后台正常启动时加载。分发包把该脚本放在根目录，只保留 packaging/README.md（简短安装说明）、配置与必要许可材料，不包含详细文档和源码归档。安装检查使用 tools/install-check.ps1（隔离安装检查脚本），只向新的本地测试目录复制文件，不运行复制的官方程序。
+## License
 
-正在通过远程连接聊天时，任何重启都必须提前说明。脚本不停止服务、不重启、不覆盖未知同名库、不删除文件；停用按安装记录核对后改名保留。内存补丁不支持热卸载，已加载的候选库也不能原地构建或从另一路径叠加新版。手动内存加载仍可用于开发诊断，重启后会清除，不是分发包的默认用法。
-
-## 文档与维护技能
-
-- docs/实现详解.md（逐行说明）：按精确行号列出核心源码，解释参数、协议、资源所有权、回调和已知限制。
-- docs/验证记录.md（验证记录）：区分独立检查、实机失败与待验证功能。
-- docs/手机端兼容修复.md（手机兼容说明）：五项反馈的证据、像素与坐标约定、修复及检查边界。
-- docs/候选包使用说明.md（候选包说明）：包内文件、配置及启用约定；源码提交后用 tools/package.ps1（候选归档脚本）生成带源码和摘要的候选包。
-- docs/部署使用说明.md（分发包使用说明）：依赖准备、通用配置、持久安装、状态检查与停用。
-- docs/续接记录.md（当前决定与候选定位）：保存用户安排的变化、固定候选及其摘要，区分当前仓库说明和旧包内说明。
-- .agents/skills/uu-adb-patching/SKILL.md（配套技能）：项目内的维护路由，含真实易错点与触发检查样例。
-- THIRD_PARTY.md（第三方依赖说明）：固定版本、来源与许可。
-
-源码变化后运行 tools/explain-source.mjs（文档生成检查脚本）的 --write（生成）和 --check（核对）动作。检查可发现行号过期，不能代替解释内容的人工复核。
-
-构建目录、分析目录和私有诊断目录全部保留。安卓临时服务文件也不会自动删除；清理时由用户自行决定。完整转储可能包含敏感信息，不随交付包分发。
+本项目自有代码暂未指定开源许可证。第三方代码按各自许可证使用，详见 [THIRD_PARTY.md](THIRD_PARTY.md)；分发补丁时请保留随包提供的声明与完整许可文件。

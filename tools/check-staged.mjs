@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-const git = args => execFileSync('git', ['-c','safe.directory='+process.cwd().replaceAll('\\','/'),...args]);
+const git = args => execFileSync('git', ['-c','safe.directory='+process.cwd().replaceAll('\\','/'),...args], { maxBuffer: 32 * 1024 * 1024 });
 const files = git(['diff','--cached','--name-only','--diff-filter=ACMR','-z']).toString('utf8').split('\0').filter(Boolean);
 let identifiers = [];
 try { identifiers = JSON.parse(fs.readFileSync('private/devices.json','utf8')).map(d=>d.serial).filter(s=>typeof s==='string' && s.length>3); }

@@ -14,6 +14,8 @@ third_party/ffmpeg/libavutil/avconfig.h（平台配置头）为本项目生成�
 
 公开项目 uu-enhance（远程增强补丁）用于参考系统版本库代理加载思路，better-gameviewer（远程输入修复项目）用于了解已有补丁方向；本项目没有复制它们的源码。相关链接和调查范围见接入调查.md（调查记录）。
 
+[Antigravity-Proxy](https://github.com/yuaotian/antigravity-proxy) 用于参考直接复制 DLL 与配置目录的部署方式，以及 README 的组织写法。本轮没有复制该项目源码或资源。
+
 ## 二进制分发时保留什么
 
 MinHook（函数挂接库）的第二条要求是：“Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.”（二进制再分发必须在随附文档或其他材料中重现版权声明、许可条件和免责声明。）完整原文同时包含反汇编引擎的声明，分发包保留整份 licenses/minhook.txt（挂接库许可），不能只给上游链接。

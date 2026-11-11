@@ -1,27 +1,26 @@
-# 安卓接入补丁
+# UU Remote Patch
 
-用于 UU（远程软件）后台 4.46.0.4716 的指定六十四位构建。安装脚本和补丁都会核对三个官方组件的摘要，其他构建不能直接使用。手机继续使用官方客户端及中继。
+让本地 ADB 设备出现在 UU 远程的多开管理里。仅适配 Windows x64、UU 被控端 4.46.0.4716 的指定构建，手机继续使用官方客户端和中继。
 
-## 安装
+## 放进去
 
-1. 从 https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1 下载 scrcpy（安卓投屏组件）5.0.1 的六十四位微软系统包，完整解压到 runtime/scrcpy（依赖目录）。需要自带的安卓调试桥、安卓服务，以及主版本为六十三和六十一的两个解码组件。
-2. 把 config.example.json（配置示例）复制为 config.local.json（本地配置）。默认相对路径可以直接使用；网络设备在 connect（网络重连列表）中填写实际的“地址:端口”，数据线设备留空。先开启安卓调试并完成设备授权或无线配对。
-3. 以管理员身份打开 PowerShell 7（命令终端），进入本目录，运行下面的安装命令。默认官方后台目录是 C:/Program Files/Netease/GameViewer/bin（被控端目录）；位置不同时，加 `-HostDirectory '实际目录'`（安装位置参数）。
+1. 下载 https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1 的 Windows x64 包，把里面的文件放进本目录下 `runtime/scrcpy/`。不要多套一层文件夹，确认能直接找到 `adb.exe`、`scrcpy-server`、`avcodec-63.dll` 和 `avutil-61.dll`。
+2. 设备开启 ADB 调试并完成授权。USB 设备通常不必改配置；网络设备在本目录的 `config.local.json` 的 `connect` 数组中填入自己的“地址:端口”。
+3. 把上一级的 `version.dll` 和本目录整个 `uu-adb-patch` 文件夹复制到 UU 的 `bin` 目录，与 `GameViewerServer.exe` 放在一起。默认位置是 `C:/Program Files/Netease/GameViewer/bin`，写入时可能需要管理员权限。
+4. 重启 UU 被控端或电脑，在手机端重新打开多开管理。
 
-```powershell
-./install.ps1 -Action Install
-```
+安装目录已经有同名 DLL 或旧补丁时，先退出后台、备份旧文件，别直接覆盖。重启会断开当前远程连接，请提前安排。
 
-脚本复制补丁、配置与依赖，不会重启远程软件。请在能接受断连时正常重启后台或电脑；补丁从下一次后台启动开始自动加载，依赖不再指向本包的解压目录。正式后台重启后的接入仍待实机确认，独立自动加载与隔离安装检查已通过。
+## 改配置、停用
 
-## 配置与停用
+安装后修改的是 UU `bin/uu-adb-patch/config.local.json`。相对路径以配置文件所在目录为起点，也支持已有依赖的绝对路径；修改后需要重启后台。网络设备会按 `connect` 尝试重连，但仍需设备自己开启网络调试。
 
-安装后编辑官方后台目录下 uu-adb-patch/config.local.json（安装后的配置），再在可接受断连时正常重启后台。网络设备会按配置尝试重连；补丁不会替设备开启网络调试，也不单独创建开机服务。
+停用时退出 UU 后台，把 `bin/version.dll` 改名为 `version.dll.disabled` 或移到安装目录外，再启动。配置和依赖可以保留；恢复时把 DLL 放回即可。关闭客户端窗口不一定退出后台，补丁不支持热卸载。
 
-运行 `./install.ps1 -Action Status`（状态检查）查看文件状态；运行 `./install.ps1 -Action Disable`（停用命令）将代理改名保留，后台下次启动时停用。当前进程不支持热卸载，不要从其他路径叠加加载。未知同名库、旧依赖目录及备份均不会自动覆盖或删除。
+## 说明
 
-已知限制：多开预览曾退回占位图；多指与长期运行缺少专项手机记录。完整说明和源码见 https://github.com/Rea1-ms/UU-Remote-Patch 。manifest.json（摘要清单）记录本包对应的精确提交和文件摘要。开发文档及源码归档不放入运行包。
+手机端主要功能已通过用户复测；复制部署的正式后台重启接入仍待实测。多开预览可能短暂退回占位图，多指和长期运行缺少专项手机记录。
 
-## 第三方许可
+本包不含 scrcpy、ADB 和解码运行库，也不含开发文档与注入工具。请保留 `THIRD_PARTY.md` 和 `licenses/` 中的完整许可。`manifest.json` 记录源码版本与文件摘要。
 
-THIRD_PARTY.md（第三方声明）及 licenses（许可目录）属于分发必需材料，请随包保留。依赖运行库由使用者从上游取得；若另外把依赖合并分发，还需按该构建的实际许可证处理，不能只附本包的三份许可。
+源码及完整说明：https://github.com/Rea1-ms/UU-Remote-Patch
