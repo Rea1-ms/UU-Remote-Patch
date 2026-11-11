@@ -53,6 +53,17 @@ scrcpy 压缩包里的文件完整保留，不要再套一层 scrcpy 版本目�
 
 安装后修改的是 UU `bin/uu-adb-patch/config.local.json`。相对路径以配置文件所在目录为起点，也支持已有依赖的绝对路径；修改后需要重启后台。网络设备会按 `connect` 尝试重连，但仍需设备自己开启网络调试。
 
+使用已有的依赖目录时，可以只改下面两个字段，其余设置保留：
+
+```json
+{
+  "adb": "D:/Program Files/scrcpy/adb.exe",
+  "scrcpy": "D:/Program Files/scrcpy"
+}
+```
+
+JSON 路径建议使用 `/`。如果使用反斜杠，每个 `\` 都要写成 `\\`；单个 `\` 会被当作转义符，可能导致解析失败或路径错误。`adb` 填 `adb.exe` 的路径，`scrcpy` 填包含 `scrcpy-server` 和解码库的目录，不能填 `scrcpy.exe`。
+
 停用时退出 UU 后台，把 `bin/version.dll` 改名为 `version.dll.disabled` 或移到安装目录外，再启动。配置和依赖可以保留；恢复时把 DLL 放回即可。关闭客户端窗口不一定退出后台，补丁不支持热卸载。
 
 ## 说明
