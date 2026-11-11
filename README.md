@@ -48,6 +48,7 @@ bin/
    │     ├─ SDL3.dll
    │     └─ swresample-7.dll
    ├─ README.md
+   ├─ LICENSE               # 本项目的 MIT 许可证
    ├─ THIRD_PARTY.md
    ├─ licenses/
    │  ├─ minhook.txt
@@ -64,7 +65,8 @@ bin/
 
 退出 UU 后台，把 `version.dll` 改名为 `version.dll.disabled`，或移到安装目录之外，再启动 UU。配置和依赖可以保留；需要恢复时把 DLL 放回原位。
 
-正在运行的补丁不能热卸载，只关客户端窗口也不一定退出后台。补丁不修改官方程序，不另建服务或计划任务；UU 更新后可能需要重新适配。
+> [!NOTE]
+> 正在运行的补丁不能热卸载。
 
 ## 作用
 
@@ -84,7 +86,7 @@ cmake --build build/dropin --config Release
 ctest --test-dir build/dropin -C Release --output-on-failure
 ```
 
-生成的补丁在 `build/dropin/Release/version.dll`。提交源码后，用 PowerShell 7 运行 `./tools/package.ps1`，部署包生成在 `dist/`；包内只有 DLL、默认配置、简短说明和许可材料，不含开发文档、截图、注入工具或运行依赖。
+生成的补丁在 `build/dropin/Release/version.dll`。提交源码后，用 PowerShell 7 运行 `./tools/package.ps1`，部署包生成在 `dist/`。
 
 ## 文档
 
@@ -106,4 +108,4 @@ ctest --test-dir build/dropin -C Release --output-on-failure
 
 ## License
 
-本项目自有代码暂未指定开源许可证。第三方代码按各自许可证使用，详见 [THIRD_PARTY.md](THIRD_PARTY.md)；分发补丁时请保留随包提供的声明与完整许可文件。
+[MIT](LICENSE)。第三方代码按各自许可证使用，详见 [THIRD_PARTY.md](THIRD_PARTY.md)；分发补丁时请保留随包提供的声明与完整许可文件。

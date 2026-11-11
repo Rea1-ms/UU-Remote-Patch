@@ -36,6 +36,7 @@ bin/
    │     ├─ SDL3.dll
    │     └─ swresample-7.dll
    ├─ README.md
+   ├─ LICENSE               # 本项目的 MIT 许可证
    ├─ THIRD_PARTY.md
    ├─ licenses/
    │  ├─ minhook.txt
@@ -61,3 +62,7 @@ scrcpy 压缩包里的文件完整保留，不要再套一层 scrcpy 版本目�
 本包不含 scrcpy、ADB 和解码运行库，也不含开发文档与注入工具。请保留 `THIRD_PARTY.md` 和 `licenses/` 中的完整许可。`manifest.json` 记录源码版本与文件摘要。
 
 源码及完整说明：https://github.com/Rea1-ms/UU-Remote-Patch
+
+## License
+
+本项目采用 [MIT](LICENSE)。第三方依赖按各自许可证使用，分发时请一并保留 `THIRD_PARTY.md` 和 `licenses/`。

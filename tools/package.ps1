@@ -26,6 +26,7 @@ New-Item -ItemType Directory -Path $licenses, (Join-Path $payload 'runtime/scrcp
 Copy-Item -LiteralPath $dll -Destination (Join-Path $destination 'version.dll')
 Copy-Item -LiteralPath $template -Destination (Join-Path $payload 'config.local.json')
 Copy-Item -LiteralPath (Join-Path $root 'packaging/README.md') -Destination (Join-Path $payload 'README.md')
+Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $payload
 Copy-Item -LiteralPath (Join-Path $root 'THIRD_PARTY.md') -Destination $payload
 Copy-Item -LiteralPath (Join-Path $root 'third_party/minhook/LICENSE.txt') -Destination (Join-Path $licenses 'minhook.txt')
 Copy-Item -LiteralPath (Join-Path $root 'third_party/json/LICENSE.MIT') -Destination (Join-Path $licenses 'json.txt')
