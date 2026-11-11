@@ -1,6 +1,7 @@
 {
-  "adb": "D:/Program Files/Platform-Tools/adb.exe",
-  "scrcpy": "D:/Program Files/scrcpy",
+  "adb": "runtime/scrcpy/adb.exe",
+  "scrcpy": "runtime/scrcpy",
+  "connect": [],
   "fps": 30,
   "max_size": 1920,
   "bit_rate": 8000000

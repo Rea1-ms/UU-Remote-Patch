@@ -21,6 +21,7 @@ namespace fs = std::filesystem;
 std::wstring wide(std::string_view value);
 std::string utf8(std::wstring_view value);
 fs::path module_folder(HMODULE module = nullptr);
+fs::path patch_folder(const fs::path& module_directory);
 void set_root(fs::path root);
 const fs::path& root();
 void log(std::string_view message);
@@ -31,6 +32,7 @@ HANDLE spawn(const fs::path& exe, const std::vector<std::wstring>& args);
 struct Config {
     fs::path adb;
     fs::path scrcpy;
+    std::vector<std::string> connect;
     int fps = 30;
     int max_size = 1920;
     int bit_rate = 8000000;

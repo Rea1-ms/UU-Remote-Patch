@@ -33,7 +33,18 @@ fs::path module_folder(HMODULE module) {
     path.resize(size);
     return fs::path(path).parent_path();
 }
-void set_root(fs::path p) { base = std::move(p); }
+fs::path patch_folder(const fs::path& folder) {
+    // Explicit developer override; release packages do not contain this file.
+    std::ifstream pointer(folder / L"patch-root.txt");std::string path;
+    if (std::getline(pointer,path) && !path.empty()) {
+        auto target=fs::path(wide(path));
+        return fs::absolute(target.is_absolute()?target:folder/target).lexically_normal();
+    }
+    auto installed=folder/L"uu-adb-patch";
+    if (fs::is_regular_file(installed/L"config.local.json")) return installed;
+    return folder;
+}
+void set_root(fs::path p) { base = fs::absolute(p).lexically_normal(); }
 const fs::path& root() { return base; }
 void log(std::string_view text) {
     std::lock_guard lock(log_lock);
@@ -118,13 +129,24 @@ void read_config() {
     std::ifstream file(base / L"config.local.json");
     if (!file) throw std::runtime_error("config.local.json missing");
     auto j = nlohmann::json::parse(file);
-    options.adb = wide(j.at("adb").get<std::string>());
-    options.scrcpy = wide(j.at("scrcpy").get<std::string>());
+    auto resolve=[](const std::string& value) {
+        if(value.empty())throw std::runtime_error("dependency path is empty");
+        fs::path path(wide(value));return (path.is_absolute()?path:base/path).lexically_normal();
+    };
+    options.adb = resolve(j.at("adb").get<std::string>());
+    options.scrcpy = resolve(j.at("scrcpy").get<std::string>());
+    options.connect = j.value("connect",std::vector<std::string>{});
+    if(options.connect.size()>32)throw std::runtime_error("too many connect endpoints");
+    for(auto& endpoint:options.connect)
+        if(endpoint.empty() || endpoint.size()>255 || endpoint.find_first_of(" \t\r\n")!=std::string::npos)
+            throw std::runtime_error("invalid connect endpoint");
     options.fps = std::clamp(j.value("fps", 30), 5, 60);
     options.max_size = std::clamp(j.value("max_size", 1920), 320, 3840);
     options.bit_rate = std::clamp(j.value("bit_rate", 8000000), 1000000, 40000000);
-    if (!fs::is_regular_file(options.adb) || !fs::is_regular_file(options.scrcpy / L"scrcpy-server"))
+    if (!fs::is_regular_file(options.adb) || !fs::is_regular_file(options.scrcpy / L"scrcpy-server") ||
+        !fs::is_regular_file(options.scrcpy/L"avcodec-63.dll") || !fs::is_regular_file(options.scrcpy/L"avutil-61.dll"))
         throw std::runtime_error("ADB or scrcpy path unavailable");
+    {std::lock_guard lock(device_lock);known.clear();}
     std::ifstream mapping(base / L"private" / L"devices.json");
     if (mapping) {
         auto m = nlohmann::json::parse(mapping);
@@ -136,6 +158,18 @@ const Config& config() { return options; }
 void refresh_devices() {
     auto result = run(options.adb, {L"devices", L"-l"});
     if (result.code) { log("device discovery failed"); return; }
+    // TCP connections belong to the ADB server and do not survive its restart.
+    // Only reconnect configured endpoints that are not already online.
+    bool retried=false;
+    for(auto& endpoint:options.connect) {
+        std::istringstream current(result.output);std::string row;bool online=false;
+        while(std::getline(current,row)) {
+            std::istringstream fields(row);std::string serial,state;fields>>serial>>state;
+            if(serial==endpoint && state=="device"){online=true;break;}
+        }
+        if(!online){run(options.adb,{L"connect",wide(endpoint)},3000);retried=true;}
+    }
+    if(retried){result=run(options.adb,{L"devices",L"-l"});if(result.code){log("device discovery failed");return;}}
     std::vector<Device> discovered;
     auto previous=devices();
     bool changed=false;

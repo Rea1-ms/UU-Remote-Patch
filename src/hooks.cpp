@@ -369,15 +369,14 @@ DWORD WINAPI patch_worker(void* module) {
         std::wstring exe(32768,L'\0');auto length=GetModuleFileNameW(nullptr,exe.data(),DWORD(exe.size()));
         if(!length || length>=exe.size())return 0;exe.resize(length);
         if(_wcsicmp(uu::fs::path(exe).filename().c_str(),L"GameViewerServer.exe"))return 0;
-        auto folder=uu::module_folder(static_cast<HMODULE>(module));
-        std::ifstream pointer(folder/L"patch-root.txt");std::string path;
-        if(std::getline(pointer,path) && !path.empty())folder=uu::wide(path);
+        auto folder=uu::patch_folder(uu::module_folder(static_cast<HMODULE>(module)));
         uu::set_root(folder);uu::log("patch loading");
         // Pin the module: detours and background tasks must remain valid until host exit.
         HMODULE pinned{};GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,
             reinterpret_cast<LPCWSTR>(&patch_worker),&pinned);
-        uu::read_config();uu::refresh_devices();uu::install_hooks();
-        for(;;){Sleep(5000);try{uu::refresh_devices();}catch(...){uu::log("discovery refresh failed");}}
+        uu::read_config();uu::install_hooks();
+        // Start even when Android/ADB is not ready at system boot.
+        for(;;){try{uu::refresh_devices();}catch(...){uu::log("discovery refresh failed");}Sleep(5000);}
     }catch(const std::exception& e){uu::log(e.what());}
     return 0;
 }

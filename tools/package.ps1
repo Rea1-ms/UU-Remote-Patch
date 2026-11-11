@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$BuildDirectory = 'build/revision2/Release')
+param([string]$BuildDirectory = 'build/portable/Release')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $build = [IO.Path]::GetFullPath((Join-Path $root $BuildDirectory))
@@ -8,15 +8,17 @@ $revision = & git @gitOptions rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw '无法读取源码提交。' }
 $dirty = & git @gitOptions status --porcelain
 if ($LASTEXITCODE -ne 0 -or $dirty) { throw '先提交并检查当前源码，再打包对应版本。' }
-foreach ($name in @('version.dll','patch_load.exe')) {
+foreach ($name in @('version.dll','patch_load.exe','startup_check.exe')) {
     if (!(Test-Path -LiteralPath (Join-Path $build $name))) { throw ('构建产物缺失：' + $name) }
 }
-$tag = 'uu-adb-patch-r2-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $revision.Substring(0,7)
+$tag = 'uu-adb-patch-portable-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $revision.Substring(0,7)
 $destination = Join-Path $root ('dist/' + $tag)
 if (Test-Path -LiteralPath $destination) { throw '候选目录已存在，保留原文件。' }
 New-Item -ItemType Directory -Path $destination | Out-Null
-foreach ($name in @('version.dll','patch_load.exe')) { Copy-Item -LiteralPath (Join-Path $build $name) -Destination $destination }
-foreach ($name in @('config.example.json','README.md','THIRD_PARTY.md')) { Copy-Item -LiteralPath (Join-Path $root $name) -Destination $destination }
+foreach ($name in @('version.dll','patch_load.exe','startup_check.exe')) { Copy-Item -LiteralPath (Join-Path $build $name) -Destination $destination }
+foreach ($name in @('config.example.json','THIRD_PARTY.md')) { Copy-Item -LiteralPath (Join-Path $root $name) -Destination $destination }
+Copy-Item -LiteralPath (Join-Path $root 'docs/部署使用说明.md') -Destination (Join-Path $destination 'README.md')
+Copy-Item -LiteralPath (Join-Path $root 'tools/install.ps1') -Destination (Join-Path $destination 'install.ps1')
 Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination $destination -Recurse
 $licenses = Join-Path $destination 'licenses'
 New-Item -ItemType Directory -Path $licenses | Out-Null
@@ -28,7 +30,7 @@ if ($LASTEXITCODE -ne 0) { throw '生成源码归档失败，保留当前目录�
 $entries = @(Get-ChildItem -LiteralPath $destination -File -Recurse | ForEach-Object {
     @{path=[IO.Path]::GetRelativePath($destination,$_.FullName).Replace('\','/'); sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 })
-@{revision=$revision; stage='candidate-unverified-on-phone'; files=$entries} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
+@{revision=$revision; stage='persistent-candidate-host-restart-pending'; architecture='windows-x64'; host_version='4.46.0.4716'; files=$entries} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
 $archive = $destination + '.zip'
 Compress-Archive -LiteralPath $destination -DestinationPath $archive
 Write-Output $archive
