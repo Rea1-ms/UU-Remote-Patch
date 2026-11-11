@@ -34,7 +34,7 @@ Copy-Item -LiteralPath (Join-Path $root 'third_party/ffmpeg/COPYING.LGPLv2.1') -
 $entries = @(Get-ChildItem -LiteralPath $destination -File -Recurse | Sort-Object FullName | ForEach-Object {
     @{path=[IO.Path]::GetRelativePath($destination,$_.FullName).Replace('\','/'); sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 })
-@{revision=$revision; source_url=('https://github.com/Rea1-ms/UU-Remote-Patch/tree/' + $revision); layout='version.dll + uu-adb-patch/'; config_origin='config.example.json'; stage='persistent-candidate-host-restart-pending'; architecture='windows-x64'; host_version='4.46.0.4716'; files=$entries} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $payload 'manifest.json') -Encoding utf8NoBOM
+@{revision=$revision; source_url=('https://github.com/Rea1-ms/UU-Remote-Patch/tree/' + $revision); layout='version.dll + uu-adb-patch/'; config_origin='config.example.json'; stage='persistent-user-verified'; architecture='windows-x64'; host_version='4.46.0.4716'; files=$entries} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $payload 'manifest.json') -Encoding utf8NoBOM
 $archive = $destination + '.zip'
 Compress-Archive -LiteralPath (Join-Path $destination 'version.dll'), $payload -DestinationPath $archive
 Write-Output $archive

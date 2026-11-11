@@ -11,7 +11,7 @@
 ### 准备
 
 - Windows x64，UU 被控端 **4.46.0.4716**。目前只适配这一构建，补丁会核对官方文件，其他版本不会启用。
-- 下载本项目的部署包，再下载 [scrcpy 5.0.1 Windows x64](https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1)。scrcpy 的依赖需要自己准备。
+- 下载[本项目的部署包](https://github.com/Rea1-ms/UU-Remote-Patch/releases/latest)，再下载 [scrcpy 5.0.1 Windows x64](https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1)。scrcpy 的依赖需要自己准备。
 - 设备开启 ADB 调试并完成授权；无线调试先完成配对。
 
 ### 放进去
@@ -20,6 +20,8 @@
 2. 打开 `uu-adb-patch/config.local.json`。USB 设备一般不用改；网络设备在 `connect` 中填写地址和端口，例如 `"connect": ["192.0.2.1:5555"]`，把示例地址换成自己的。
 3. 把 **`version.dll` 和整个 `uu-adb-patch` 文件夹**复制到 UU 的 `bin` 目录，与 `GameViewerServer.exe` 放在一起。默认位置是 `C:/Program Files/Netease/GameViewer/bin`，写入这个目录通常需要管理员权限。
 4. 重启 UU 被控端或电脑，手机重新打开多开管理，就能看到 ADB 设备。
+
+注意是 `GameViewer/bin`，不是上一级 `GameViewer` 目录；放错位置时，后台不会加载补丁。
 
 最后的目录大致这样：
 
