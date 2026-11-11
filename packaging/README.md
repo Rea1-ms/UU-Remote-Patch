@@ -9,6 +9,43 @@
 3. 把上一级的 `version.dll` 和本目录整个 `uu-adb-patch` 文件夹复制到 UU 的 `bin` 目录，与 `GameViewerServer.exe` 放在一起。默认位置是 `C:/Program Files/Netease/GameViewer/bin`，写入时可能需要管理员权限。
 4. 重启 UU 被控端或电脑，在手机端重新打开多开管理。
 
+准备好依赖后的参考文件树：
+
+```text
+bin/
+├─ GameViewerServer.exe       # UU 原有文件
+├─ version.dll               # 补丁入口
+└─ uu-adb-patch/
+   ├─ config.local.json      # 设备和画面设置
+   ├─ runtime/
+   │  └─ scrcpy/             # scrcpy 压缩包里的文件直接放在这里
+   │     ├─ adb.exe
+   │     ├─ AdbWinApi.dll
+   │     ├─ AdbWinUsbApi.dll
+   │     ├─ avcodec-63.dll
+   │     ├─ avformat-63.dll
+   │     ├─ avutil-61.dll
+   │     ├─ disconnected.png
+   │     ├─ libusb-1.0.dll
+   │     ├─ LICENSE.txt
+   │     ├─ open_a_terminal_here.bat
+   │     ├─ scrcpy-noconsole.vbs
+   │     ├─ scrcpy-server
+   │     ├─ scrcpy.exe
+   │     ├─ scrcpy.png
+   │     ├─ SDL3.dll
+   │     └─ swresample-7.dll
+   ├─ README.md
+   ├─ THIRD_PARTY.md
+   ├─ licenses/
+   │  ├─ minhook.txt
+   │  ├─ json.txt
+   │  └─ ffmpeg.txt
+   └─ manifest.json
+```
+
+scrcpy 压缩包里的文件完整保留，不要再套一层 scrcpy 版本目录。
+
 安装目录已经有同名 DLL 或旧补丁时，先退出后台、备份旧文件，别直接覆盖。重启会断开当前远程连接，请提前安排。
 
 ## 改配置、停用
