@@ -2,7 +2,7 @@
 param(
     [ValidateSet('Status','Install','Disable')][string]$Action = 'Status',
     [string]$HostDirectory = 'C:/Program Files/Netease/GameViewer/bin',
-    [string]$BuildDirectory = 'build/candidate/Release'
+    [string]$BuildDirectory = 'build/revision2/Release'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -15,7 +15,7 @@ $expected = @{
     'nemu-api.dll' = '40f44159d6fd637e2226a133508d032470e5caf22f35ef1065c86438fdd90abb'
 }
 if ($Action -eq 'Install') {
-    throw '崩溃修复已完成独立验证，但官方手机端接入尚未通过；持久化安装暂不开放。'
+    throw '官方手机已确认设备和画面；第二修订尚待手机验证，持久化安装暂不开放。'
 }
 if ($Action -eq 'Disable') {
     $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -36,4 +36,4 @@ foreach ($name in ($expected.Keys | Sort-Object)) {
     [pscustomobject]@{ Component=$name; MatchesSupportedBuild=$matches }
 }
 Write-Output ('安装目录中有同名库：' + (Test-Path -LiteralPath $installed))
-Write-Output '当前阶段：离线排查。此脚本不会停止、启动或重启远程程序。'
+Write-Output '当前阶段：第二修订待手机验证。此脚本不会停止、启动或重启远程程序。'

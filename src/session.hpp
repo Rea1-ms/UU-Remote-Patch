@@ -3,7 +3,6 @@
 #include "input.hpp"
 
 namespace uu {
-struct Frame { int width=0,height=0; uint64_t sequence=0; std::vector<uint8_t> pixels; };
 class Session {
 public:
     using Resize = std::function<void(int,int)>;
@@ -14,6 +13,7 @@ public:
     std::shared_ptr<const Frame> latest();
     bool event(std::string_view command) { return input_.event(command); }
     bool text(std::string_view text) { return input_.text(text); }
+    bool system(std::string_view operation) {return input_.system(operation);}
     bool alive() const { return !stopped_ && ready_; }
 private:
     Device device_;

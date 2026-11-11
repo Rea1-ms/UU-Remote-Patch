@@ -136,9 +136,9 @@ const Config& config() { return options; }
 void refresh_devices() {
     auto result = run(options.adb, {L"devices", L"-l"});
     if (result.code) { log("device discovery failed"); return; }
-    std::lock_guard lock(device_lock);
+    std::vector<Device> discovered;
+    auto previous=devices();
     bool changed=false;
-    for (auto& d : known) d.online = false;
     std::istringstream lines(result.output);
     std::string line;
     while (std::getline(lines, line)) {
@@ -147,12 +147,28 @@ void refresh_devices() {
         parts >> serial >> state;
         if (state != "device") continue;
         while (parts >> item) if (item.starts_with("model:")) model = item.substr(6);
+        auto prior=std::find_if(previous.begin(),previous.end(),[&](auto& d){return d.serial==serial;});
+        int width=prior==previous.end()?0:prior->width,height=prior==previous.end()?0:prior->height;
+        if(width<1 || height<1) {
+            auto size=run(options.adb,{L"-s",wide(serial),L"shell",L"wm",L"size"},3000);
+            auto at=size.output.rfind("size:");
+            if(size.code==0 && at!=std::string::npos) {
+                std::istringstream dimensions(size.output.substr(at+5));char separator{};
+                if(!(dimensions>>width>>separator>>height) || separator!='x' || width<1 || height<1 || width>16384 || height>16384)width=height=0;
+            }
+        }
+        discovered.push_back({0,serial,model,true,width,height});
+    }
+    std::lock_guard lock(device_lock);
+    for (auto& d : known) d.online = false;
+    for(auto& found:discovered) {
+        auto& serial=found.serial;
         auto it = std::find_if(known.begin(), known.end(), [&](auto& d) { return d.serial == serial; });
-        if (it != known.end()) { it->online = true; continue; }
+        if (it != known.end()) { it->online=true;it->width=found.width;it->height=found.height;continue; }
         int index = 10000;
         for (auto& d : known) index = std::max(index, d.index + 1);
         if (index >= 20000) { log("device limit reached"); continue; }
-        known.push_back({index, serial, "ADB " + std::to_string(index - 9999) + " - " + model, true});
+        known.push_back({index, serial, "ADB " + std::to_string(index - 9999) + " - " + found.name, true,found.width,found.height});
         changed=true;
         log("discovered virtual instance " + std::to_string(index));
     }

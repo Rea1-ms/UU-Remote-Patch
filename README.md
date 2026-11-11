@@ -2,7 +2,7 @@
 
 目标是让本地安卓设备通过现有远程软件的模拟器入口显示和操作，沿用现有客户端、账号及中继。
 
-当前处于实机验证阶段，尚未交付可用发行版。首次加载导致后台栈溢出，已经定位并在独立进程复现、修复；修正版通过小栈线程检查，并已免重启加载到正式后台，观察超过五分钟未见进程更换或新的崩溃事件。官方手机端接入尚待确认。详细记录见 docs/验证记录.md（验证记录）。
+官方手机端已确认能看到新增设备和画面，当前仍处于实机验证阶段。用户反馈预览偏色、偶发连接错误、导航键不可用、强制竖屏和切换手势不可用；第二修订已针对这些问题完成修改及独立检查，尚未替换运行中的首个修正版。详细记录见 docs/验证记录.md（验证记录）。
 
 补丁运行在电脑被控端。设备管理、画面采集和触控转发由本地适配代码完成，远程传输继续使用原程序。目前仅核对官方后台 4.46.0.4716 的三个精确二进制摘要；其他版本不能直接使用。
 
@@ -13,9 +13,9 @@
 复制 config.example.json（配置示例）为 config.local.json（本地配置），填写本机调试桥程序和投屏组件目录。当前组件要求 scrcpy（安卓投屏组件）5.0.1、avcodec（视频解码库）63 和 avutil（多媒体工具库）61；这些程序不包含在源码中。
 
 ```powershell
-cmake -S . -B build/candidate -G 'Visual Studio 18 2026' -A x64
-cmake --build build/candidate --config Release
-ctest --test-dir build/candidate -C Release --output-on-failure
+cmake -S . -B build/revision2 -G 'Visual Studio 18 2026' -A x64
+cmake --build build/revision2 --config Release
+ctest --test-dir build/revision2 -C Release --output-on-failure
 ```
 
 上面使用 CMake（构建工具）及微软六十四位编译器。自动检查覆盖多指包、共享纹理和系统代理，其中代理检查会创建八个六十四千字节栈的线程，覆盖本次崩溃条件。
@@ -23,22 +23,24 @@ ctest --test-dir build/candidate -C Release --output-on-failure
 只读设备检查与管理接口检查需要本地配置，不在普通构建中自动运行：
 
 ```powershell
-./build/candidate/Release/bridge_check.exe device
-./build/candidate/Release/management_check.exe 'C:/Program Files/Netease/GameViewer/bin/nemu-api.dll' 'D:/Program Files/MuMuPlayer'
+./build/revision2/Release/bridge_check.exe device
+./build/revision2/Release/management_check.exe 'C:/Program Files/Netease/GameViewer/bin/nemu-api.dll' 'D:/Program Files/MuMuPlayer' video
 ```
 
-设备检查会上传安卓服务文件、建立本机转发并读取画面，不发送触控。管理检查只在独立进程调用接口，不加载到正式后台；它核对原实例回退、列表容量、四个虚拟设备、短字符串和未连接渲染通道的销毁。
+设备检查会上传安卓服务文件、建立本机转发并读取画面，不发送触控。管理检查只在独立进程调用接口，不加载到正式后台；核对管理接口、同设备独立句柄及退役句柄。末尾 video（视频检查）参数额外运行三轮双通道只读连接、预览、回调重入和独立销毁。
 
 ## 加载与停用
 
 tools/install.ps1（安装管理脚本）默认只查状态，当前拒绝持久化安装。免重启加载使用 tools/patch-load.cpp（本地加载工具）生成的程序，要求管理员权限；成功加载不代表接入成功。首次实机已发生崩溃，不能将“免重启”理解为没有断连风险。
 
-正在通过远程连接聊天时，任何重启都必须提前说明。脚本不停止服务、不重启、不覆盖未知同名库、不删除文件。内存中的补丁不支持卸载；候选库加载后须改用新的构建目录，避免覆盖正在使用的库。
+正在通过远程连接聊天时，任何重启都必须提前说明。脚本不停止服务、不重启、不覆盖未知同名库、不删除文件。内存补丁不支持卸载；候选库加载后须改用新的构建目录。加载器拒绝从另一路径叠加同名补丁，因此第二修订启用前需要先重启后台，这会中断当前远程连接。
 
 ## 文档与维护技能
 
 - docs/实现详解.md（逐行说明）：按精确行号列出核心源码，解释参数、协议、资源所有权、回调和已知限制。
 - docs/验证记录.md（验证记录）：区分独立检查、实机失败与待验证功能。
+- docs/手机端兼容修复.md（手机兼容说明）：五项反馈的证据、像素与坐标约定、修复及检查边界。
+- docs/候选包使用说明.md（候选包说明）：包内文件、配置及启用约定；源码提交后用 tools/package.ps1（候选归档脚本）生成带源码和摘要的候选包。
 - .agents/skills/uu-adb-patching/SKILL.md（配套技能）：项目内的维护路由，含真实易错点与触发检查样例。
 - THIRD_PARTY.md（第三方依赖说明）：固定版本、来源与许可。
 

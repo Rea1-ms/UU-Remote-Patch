@@ -37,7 +37,7 @@ struct Config {
 };
 const Config& config();
 void read_config();
-struct Device { int index; std::string serial, name; bool online = false; };
+struct Device { int index; std::string serial, name; bool online = false; int width=0,height=0; };
 void refresh_devices();
 std::vector<Device> devices();
 std::optional<Device> device(int index);

@@ -38,6 +38,10 @@ int wmain(int argc,wchar_t** argv) {
         for(BOOL more=Module32FirstW(snapshot,&module);more;more=Module32NextW(snapshot,&module)) {
             if(!_wcsicmp(module.szModule,owner_name.c_str()))remote_owner=reinterpret_cast<uintptr_t>(module.modBaseAddr);
             if(!_wcsicmp(module.szExePath,dll.c_str())){CloseHandle(snapshot);CloseHandle(process);std::cout<<"Patch already loaded.\n";report<<"Patch already loaded.\n";return 0;}
+            if(!_wcsicmp(module.szModule,L"version.dll") && !fs::equivalent(fs::path(module.szExePath).parent_path(),fs::path(L"C:/Windows/System32"))) {
+                CloseHandle(snapshot);CloseHandle(process);
+                throw std::runtime_error("another version.dll is already loaded; restart the host before changing patch builds");
+            }
         }
         CloseHandle(snapshot);check(remote_owner!=0,"remote loader module unavailable");
         auto loader=reinterpret_cast<LPTHREAD_START_ROUTINE>(remote_owner+reinterpret_cast<uintptr_t>(load)-reinterpret_cast<uintptr_t>(local_owner));

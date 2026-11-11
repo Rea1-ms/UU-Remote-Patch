@@ -1,5 +1,6 @@
 #pragma once
 #include "common.hpp"
+#include "frame.hpp"
 #include <map>
 
 namespace uu {
@@ -10,6 +11,7 @@ public:
     void size(int width, int height);
     bool event(std::string_view commands);
     bool text(std::string_view value);
+    bool system(std::string_view operation);
     void reset();
 private:
     struct Point { int tracking, x, y; };

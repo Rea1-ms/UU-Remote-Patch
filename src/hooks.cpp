@@ -20,16 +20,27 @@ static NrdCallbacks* native_callbacks=nullptr;
 static std::mutex callbacks_mutex, channels_mutex;
 struct Channel {
     int index=0,id=0;
-    std::unique_ptr<Session> session;
+    std::shared_ptr<Session> session;
+    bool connecting=false,closed=false;
+    int reported_width=0,reported_height=0;
     TextureWriter texture;
     std::mutex lifecycle;
 };
 static std::map<int,std::shared_ptr<Channel>> channels;
+static std::atomic<uint32_t> next_channel{0x40000000};
+static std::mutex geometry_mutex;
+static std::map<int,Geometry> geometries;
+static void remember_geometry(int index,int width,int height){std::lock_guard lock(geometry_mutex);geometries[index]={width,height};}
+static Geometry geometry_for(const Device& d){std::lock_guard lock(geometry_mutex);auto it=geometries.find(d.index);return it==geometries.end()?Geometry{d.width,d.height}:it->second;}
+static bool virtual_handle(int id){return id>=0x40000000;}
+static std::shared_ptr<Session> session(const std::shared_ptr<Channel>& c){std::lock_guard lock(c->lifecycle);return c->closed?nullptr:c->session;}
 static NrdCallbacks get_callbacks(){std::lock_guard lock(callbacks_mutex);return callbacks.system?callbacks:(native_callbacks?*native_callbacks:NrdCallbacks{});}
 static std::shared_ptr<Channel> channel(int id){std::lock_guard lock(channels_mutex);auto it=channels.find(id);return it==channels.end()?nullptr:it->second;}
 static void notify(const std::shared_ptr<Channel>& c,int width,int height) {
+    {std::lock_guard lock(c->lifecycle);if(c->closed)return;c->reported_width=width;c->reported_height=height;}
     auto cb=get_callbacks();if(!cb.system)return;
-    auto display="0 "+std::to_string(width)+" "+std::to_string(height)+" 0";
+    Geometry geometry{width,height};
+    auto display="0 "+std::to_string(geometry.raw_width())+" "+std::to_string(geometry.raw_height())+" "+std::to_string(geometry.rotation());
     auto info=c->texture.info(width,height);
     cb.system(c->id,"active_display",display.c_str());
     cb.system(c->id,"renderer_info",info.c_str());
@@ -45,8 +56,8 @@ static std::string setting(int index,std::string_view key) {
     if(key=="renderer_mode")return "dx";
     if(key=="resolution_mode")return "custom";
     if(key=="frame_rate" || key=="max_frame_rate")return std::to_string(config().fps);
-    if(key=="resolution_width.custom")return "1080";
-    if(key=="resolution_height.custom")return "1920";
+    if(key=="resolution_width.custom"){auto g=geometry_for(*d);return g.width>0?std::to_string(g.raw_width()):"";}
+    if(key=="resolution_height.custom"){auto g=geometry_for(*d);return g.height>0?std::to_string(g.raw_height()):"";}
     if(key=="resolution_dpi.custom")return "240";
     if(key=="performance_mode")return "custom";
     if(key=="performance_cpu.custom")return "4";
@@ -140,77 +151,88 @@ static int create(const char* name) {
     if(!name || !std::string_view(name).starts_with("uadb"))return original_create(name);
     try {
         int index=std::stoi(name+4);if(!is_virtual(index))return -1;
-        auto c=std::make_shared<Channel>();c->index=index;c->id=0x40000000+index;
-        std::lock_guard lock(channels_mutex);channels[c->id]=c;
+        auto c=std::make_shared<Channel>();c->index=index;
+        auto id=next_channel.fetch_add(1);if(id>=0x7fffffff)return -1;c->id=int(id);
+        std::lock_guard lock(channels_mutex);channels.emplace(c->id,c);
         log("created virtual renderer "+std::to_string(index));return c->id;
     }catch(...){return -1;}
 }
 static int connect(int id) {
-    auto c=channel(id);if(!c)return original_connect(id);
+    auto c=channel(id);if(!c)return virtual_handle(id)?-1:original_connect(id);
+    std::shared_ptr<Session> started,retired;
     try {
-        std::lock_guard lock(c->lifecycle);
-        if(c->session && c->session->alive())return 0;
-        c->session.reset();auto d=device(c->index);if(!d || !d->online)return -1;
-        std::weak_ptr<Channel> weak=c;
-        c->session=std::make_unique<Session>(*d,[weak](int w,int h){if(auto c=weak.lock())notify(c,w,h);});
-        if(!c->session->start()){c->session.reset();return -1;}
+        auto d=device(c->index);if(!d || !d->online)return -1;
+        {
+            std::lock_guard lock(c->lifecycle);
+            if(c->closed || c->connecting)return -1;
+            if(c->session && c->session->alive())return 0;
+            // Decoder callbacks update only local metadata. Host callbacks run on
+            // request threads, so a reentrant destroy can safely join the reader.
+            started=std::make_shared<Session>(*d,[index=c->index](int w,int h){remember_geometry(index,w,h);});
+            retired=std::move(c->session);c->session=started;c->connecting=true;
+        }
+        retired.reset(); // Stop old readers without holding a callback's lifecycle lock.
+        bool ok=started->start();
+        {
+            std::lock_guard lock(c->lifecycle);c->connecting=false;
+            if(!ok || c->closed){if(c->session==started)c->session.reset();return -1;}
+        }
+        auto frame=started->latest();if(frame)notify(c,frame->width,frame->height);
         log("connected virtual renderer "+std::to_string(c->index));return 0;
-    }catch(const std::exception& e){log(e.what());return -1;}
+    }catch(const std::exception& e){
+        {std::lock_guard lock(c->lifecycle);c->connecting=false;if(c->session==started)c->session.reset();}
+        log(e.what());return -1;
+    }
 }
 static void destroy(int id) {
-    auto c=channel(id);if(!c){original_destroy(id);return;}
+    auto c=channel(id);if(!c){if(!virtual_handle(id))original_destroy(id);return;}
     {std::lock_guard lock(channels_mutex);channels.erase(id);}
-    std::unique_ptr<Session> retired;
-    {std::lock_guard lock(c->lifecycle);retired=std::move(c->session);}
+    std::shared_ptr<Session> retired;
+    {std::lock_guard lock(c->lifecycle);c->closed=true;retired=std::move(c->session);}
     // Joining a reader must not hold the lock that a host callback may reenter.
     retired.reset();
     log("destroyed virtual renderer "+std::to_string(c->index));
 }
 static int send(int id,int type,void* data,int size) {
-    auto c=channel(id);if(!c)return original_send(id,type,data,size);
+    auto c=channel(id);if(!c)return virtual_handle(id)?-1:original_send(id,type,data,size);
     if(type!=1 || !data || size!=sizeof(SharedFrame))return -1;
     try {
-        std::lock_guard lock(c->lifecycle);
-        if(!c->session || !c->session->alive())return -1;
-        auto frame=c->session->latest();if(!frame)return -1;
+        auto s=session(c);if(!s || !s->alive())return -1;
+        auto frame=s->latest();if(!frame)return -1;
+        bool changed;
+        {std::lock_guard lock(c->lifecycle);changed=c->reported_width!=frame->width || c->reported_height!=frame->height;}
+        if(changed){notify(c,frame->width,frame->height);return 1;}
         return c->texture.write(*static_cast<SharedFrame*>(data),*frame)?0:-1;
     }catch(...){return -1;}
 }
 static int event(int id,const char* data,int size) {
-    auto c=channel(id);if(!c)return original_event(id,data,size);
+    auto c=channel(id);if(!c)return virtual_handle(id)?-1:original_event(id,data,size);
     if(!data || size<0 || size>16384)return -1;
-    std::lock_guard lock(c->lifecycle);
-    bool ok=c->session && c->session->event(std::string_view(data,size));
+    auto s=session(c);bool ok=s && s->event(std::string_view(data,size));
     if(!ok)log("unsupported or disconnected input for instance "+std::to_string(c->index));
     return ok?0:-1;
 }
 static int text(int id,const char* data) {
-    auto c=channel(id);if(!c)return original_text(id,data);
+    auto c=channel(id);if(!c)return virtual_handle(id)?-1:original_text(id,data);
     if(!data)return -1;
-    std::lock_guard lock(c->lifecycle);return c->session && c->session->text(data)?0:-1;
+    auto s=session(c);return s && s->text(data)?0:-1;
 }
 static int operate(int id,const char* name,const char* data) {
-    auto c=channel(id);if(!c)return original_operate(id,name,data);
+    auto c=channel(id);if(!c)return virtual_handle(id)?-1:original_operate(id,name,data);
     if(!name)return -1;
     if(std::string_view(name)=="renderer_info" || std::string_view(name)=="active_display") {
-        std::shared_ptr<const Frame> frame;
-        {std::lock_guard lock(c->lifecycle);if(c->session)frame=c->session->latest();}
+        auto s=session(c);auto frame=s?s->latest():nullptr;
         if(frame)notify(c,frame->width,frame->height);return frame?0:-1;
     }
+    if(std::string_view(name)=="tab_manage"){auto s=session(c);return s && s->system(name)?0:-1;}
     log("unsupported system operation "+std::string(name));return -1;
 }
 static int screenshot(int id,int width,int height) {
-    auto c=channel(id);if(!c)return original_screenshot(id,width,height);
+    auto c=channel(id);if(!c)return virtual_handle(id)?-1:original_screenshot(id,width,height);
     if(width<1 || height<1 || width>4096 || height>4096)return -1;
-    std::shared_ptr<const Frame> frame;
-    {std::lock_guard lock(c->lifecycle);if(c->session)frame=c->session->latest();}
+    auto s=session(c);auto frame=s?s->latest():nullptr;
     auto cb=get_callbacks();if(!frame || !cb.screenshot)return -1;
-    std::vector<uint8_t> pixels(size_t(width)*height*4);
-    for(int y=0;y<height;++y)for(int x=0;x<width;++x) {
-        auto* dst=pixels.data()+(size_t(y)*width+x)*4;
-        const auto* src=frame->pixels.data()+(size_t(int64_t(y)*frame->height/height)*frame->width+size_t(int64_t(x)*frame->width/width))*4;
-        std::copy_n(src,4,dst);
-    }
+    auto pixels=frame_pixels(*frame,width,height,false,true);
     cb.screenshot(id,width,height,int(pixels.size()),pixels.data());return 0;
 }
 template<class T> static void hook(void* address,T detour,T& original) {
@@ -269,7 +291,23 @@ static void install_hooks() {
     log("hooks active for host 4.46.0.4716");
 }
 #ifdef UU_PATCH_CONTRACT_CHECK
-int check_management(const fs::path& library,const fs::path& installation) {
+static std::atomic<bool> check_callback_ok{true};
+static std::atomic<int> check_screenshots{0};
+static void check_system(int id,const char* name,const char* data) {
+    auto c=channel(id);auto s=c?session(c):nullptr;auto frame=s?s->latest():nullptr;
+    if(!frame){check_callback_ok=false;return;}
+    auto geometry=frame->geometry();
+    if(std::string_view(name)=="active_display") {
+        std::istringstream values(data);int display,w,h,rotation;
+        if(!(values>>display>>w>>h>>rotation) || display!=0 || w!=geometry.raw_width() ||
+           h!=geometry.raw_height() || rotation!=geometry.rotation())check_callback_ok=false;
+    }
+}
+static void check_screenshot(int id,int w,int h,int bytes,const void* pixels) {
+    if(!channel(id) || w!=320 || h!=180 || bytes!=w*h*4 || !pixels)check_callback_ok=false;
+    ++check_screenshots;
+}
+int check_management(const fs::path& library,const fs::path& installation,bool video) {
     auto require=[](bool ok,const char* message){if(!ok)throw std::runtime_error(message);};
     auto lib=LoadLibraryExW(library.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     require(lib!=nullptr,"management library unavailable");
@@ -298,8 +336,29 @@ int check_management(const fs::path& library,const fs::path& installation) {
         require(std::count(result.begin(),result.end(),d.index)==1,"virtual index missing or duplicated");
         require(get(d.index,"player_name",name,sizeof(name))==0 && name==d.name,"virtual name differs");
         require(instance(&out,nullptr,unsigned(d.index),&exported)==&out && out.size<16 && out.capacity==15 && exported,"short string layout differs");
-        auto id=create(out.data);require(id>=0,"virtual renderer creation failed");
+        auto id=create(out.data),second=create(out.data);
+        require(id>=0 && second>=0 && id!=second,"same-device renderer handles collided");
         require(screenshot(id,320,240)==-1,"unconnected screenshot should fail");destroy(id);
+        require(!channel(id) && channel(second)!=nullptr,"destroy removed the other renderer");
+        require(connect(id)==-1 && event(id,"",0)==-1 && operate(id,"renderer_info","")==-1,"retired virtual handle reached native renderer");
+        destroy(id);destroy(second);
+    }
+    if(video) {
+        callbacks={check_system,check_screenshot,nullptr,nullptr};
+        auto d=std::find_if(found.begin(),found.end(),[](auto& d){return d.online;});
+        auto name="uadb"+std::to_string(d->index);
+        for(int attempt=0;attempt<3;++attempt) {
+            int first=create(name.c_str()),second=create(name.c_str()),a=-1,b=-1;
+            require(first>=0 && second>=0 && first!=second,"parallel renderer creation failed");
+            std::thread one([&]{a=connect(first);}),two([&]{b=connect(second);});one.join();two.join();
+            require(a==0 && b==0,"parallel video connection failed");
+            require(screenshot(first,320,180)==0 && screenshot(second,320,180)==0,"parallel preview failed");
+            destroy(first);
+            require(operate(second,"renderer_info","")==0 && screenshot(second,320,180)==0,"destroy interrupted another channel");
+            require(check_callback_ok && check_screenshots==(attempt+1)*3,"host callback geometry or reentry failed");
+            destroy(second);
+        }
+        callbacks={};
     }
     uninit();return int(online);
 }

@@ -18,45 +18,35 @@ TextureWriter::TextureWriter() {
     if(!device_)throw std::runtime_error("compatible graphics adapter unavailable");
 }
 std::string TextureWriter::info(int w,int h) const {
-    std::ostringstream out;out<<w<<' '<<h<<' '<<vendor_<<' '<<device_id_<<" 1 0 "<<config().fps<<' '<<GetCurrentProcessId();return out.str();
+    Geometry geometry{w,h};
+    std::ostringstream out;out<<geometry.raw_width()<<' '<<geometry.raw_height()<<' '<<vendor_<<' '<<device_id_<<" 1 "<<geometry.rotation()<<' '<<config().fps<<' '<<GetCurrentProcessId();return out.str();
 }
 bool TextureWriter::write(const SharedFrame& shared,const Frame& frame) {
     if(shared.width<1 || shared.height<1 || shared.width>4096 || shared.height>4096 || !shared.handle)return false;
     // These handles belong to the host process. Never close the caller's handle.
     if(shared.pid!=GetCurrentProcessId())return false;
     std::lock_guard lock(mutex_);
-    auto key=std::make_pair(shared.handle,shared.nt_handle);
-    auto found=targets_.find(key);
-    if(found==targets_.end()) {
-        Target target;
-        HRESULT hr;
-        if(shared.nt_handle) {
-            Ptr<ID3D11Device1> d;device_.As(&d);if(!d)return false;
-            hr=d->OpenSharedResource1(shared.handle,IID_PPV_ARGS(&target.texture));
-        } else hr=device_->OpenSharedResource(shared.handle,IID_PPV_ARGS(&target.texture));
-        if(FAILED(hr) || FAILED(target.texture.As(&target.mutex))) {log("shared texture open failed");return false;}
-        if(targets_.size()>=4)targets_.clear();
-        found=targets_.emplace(key,std::move(target)).first;
-    }
-    auto& target=found->second;
-    D3D11_TEXTURE2D_DESC desc{};target.texture->GetDesc(&desc);
+    // Reopen for every request: the host can close and reuse a numeric handle
+    // during rotation or switching. A cache would retain the retired texture.
+    Ptr<ID3D11Texture2D> texture;Ptr<IDXGIKeyedMutex> mutex;
+    HRESULT hr;
+    if(shared.nt_handle) {
+        Ptr<ID3D11Device1> d;device_.As(&d);if(!d)return false;
+        hr=d->OpenSharedResource1(shared.handle,IID_PPV_ARGS(&texture));
+    } else hr=device_->OpenSharedResource(shared.handle,IID_PPV_ARGS(&texture));
+    if(FAILED(hr) || FAILED(texture.As(&mutex))){log("shared texture open failed");return false;}
+    D3D11_TEXTURE2D_DESC desc{};texture->GetDesc(&desc);
     if(desc.Width!=shared.width || desc.Height!=shared.height || desc.SampleDesc.Count!=1 ||
        (desc.Format!=DXGI_FORMAT_B8G8R8A8_UNORM && desc.Format!=DXGI_FORMAT_R8G8B8A8_UNORM))return false;
-    if(target.mutex->AcquireSync(0,100)!=S_OK)return false;
     const uint8_t* pixels=frame.pixels.data();
     std::vector<uint8_t> scaled;
-    if(shared.width!=uint32_t(frame.width) || shared.height!=uint32_t(frame.height) || desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM) {
-        scaled.resize(size_t(shared.width)*shared.height*4);
-        for(UINT y=0;y<shared.height;++y)for(UINT x=0;x<shared.width;++x) {
-            auto* dst=scaled.data()+(size_t(y)*shared.width+x)*4;
-            const auto* src=pixels+(size_t(uint64_t(y)*frame.height/shared.height)*frame.width+size_t(uint64_t(x)*frame.width/shared.width))*4;
-            std::copy_n(src,4,dst);
-            if(desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM)std::swap(dst[0],dst[2]);
-        }
+    if(frame.geometry().landscape() || shared.width!=uint32_t(frame.width) || shared.height!=uint32_t(frame.height) || desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM) {
+        scaled=frame_pixels(frame,int(shared.width),int(shared.height),true,desc.Format==DXGI_FORMAT_R8G8B8A8_UNORM);
         pixels=scaled.data();
     }
-    context_->UpdateSubresource(target.texture.Get(),0,nullptr,pixels,shared.width*4,0);
+    if(mutex->AcquireSync(0,100)!=S_OK)return false;
+    context_->UpdateSubresource(texture.Get(),0,nullptr,pixels,shared.width*4,0);
     context_->Flush();
-    return SUCCEEDED(target.mutex->ReleaseSync(1));
+    return SUCCEEDED(mutex->ReleaseSync(1));
 }
 }

@@ -104,7 +104,8 @@ bool Session::start() {
     auto serial=wide(device_.serial);
     auto result=run(config().adb,{L"-s",serial,L"push",(config().scrcpy/L"scrcpy-server").wstring(),L"/data/local/tmp/uu-adb-scrcpy-5.0.1.jar"},20000);
     if(result.code) {log("server upload failed for instance "+std::to_string(device_.index));return false;}
-    uint32_t scid=(GetCurrentProcessId()^GetTickCount()^uint32_t(device_.index))&0x7fffffff;
+    static std::atomic<uint32_t> next_scid{(GetCurrentProcessId()*2654435761u)^GetTickCount()};
+    uint32_t scid=next_scid.fetch_add(1)&0x7fffffff;
     wchar_t hex[9]{};swprintf_s(hex,L"%08x",scid);
     result=run(config().adb,{L"-s",serial,L"forward",L"tcp:0",std::wstring(L"localabstract:scrcpy_")+hex});
     if(result.code)return false;

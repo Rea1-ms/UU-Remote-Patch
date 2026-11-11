@@ -3,7 +3,6 @@
 #include <d3d11_1.h>
 #include <dxgi1_2.h>
 #include <wrl/client.h>
-#include <map>
 namespace uu {
 struct SharedFrame {
     uint32_t width, height;
@@ -21,11 +20,9 @@ public:
     bool write(const SharedFrame& destination,const Frame& frame);
 private:
     template<class T> using Ptr=Microsoft::WRL::ComPtr<T>;
-    struct Target {Ptr<ID3D11Texture2D> texture; Ptr<IDXGIKeyedMutex> mutex;};
     Ptr<ID3D11Device> device_;
     Ptr<ID3D11DeviceContext> context_;
     UINT vendor_=0,device_id_=0;
     std::mutex mutex_;
-    std::map<std::pair<HANDLE,bool>,Target> targets_;
 };
 }
