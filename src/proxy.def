@@ -1,0 +1,19 @@
+LIBRARY version
+EXPORTS
+GetFileVersionInfoA=proxy0
+GetFileVersionInfoByHandle=proxy1
+GetFileVersionInfoExA=proxy2
+GetFileVersionInfoExW=proxy3
+GetFileVersionInfoSizeA=proxy4
+GetFileVersionInfoSizeExA=proxy5
+GetFileVersionInfoSizeExW=proxy6
+GetFileVersionInfoSizeW=proxy7
+GetFileVersionInfoW=proxy8
+VerFindFileA=proxy9
+VerFindFileW=proxy10
+VerInstallFileA=proxy11
+VerInstallFileW=proxy12
+VerLanguageNameA=proxy13
+VerLanguageNameW=proxy14
+VerQueryValueA=proxy15
+VerQueryValueW=proxy16
