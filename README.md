@@ -48,7 +48,6 @@ bin/
    │     ├─ SDL3.dll
    │     └─ swresample-7.dll
    ├─ README.md
-   ├─ LICENSE               # 本项目的 MIT 许可证
    ├─ THIRD_PARTY.md
    ├─ licenses/
    │  ├─ minhook.txt
@@ -83,9 +82,9 @@ JSON 路径建议使用 `/`。如果使用反斜杠，每个 `\` 都要写成 `\
 
 - 在原模拟器列表后追加 ADB 设备，保留原来的 MuMu 实例。
 - 显示多开预览和设备画面，转发触控与返回、主页、最近任务操作。
-- 支持横屏及手机端上下滑动切换设备，不需要修改手机 APK。
+- 支持横屏及手机端上下滑动切换设备。
 
-当前已在手机端确认上述主要功能。打开多开管理时，预览仍可能短暂退回占位图；多指和长期稳定性尚未专项验证。新的复制部署方式已做独立检查，正式后台重启后的接入还等实测。
+当前已在手机端确认上述主要功能。打开多开管理时，预览仍可能短暂退回占位图；多指和长期稳定性尚未验证。
 
 ## 构建
 
@@ -112,6 +111,7 @@ ctest --test-dir build/dropin -C Release --output-on-failure
 
 ## 致谢
 
+- [LINUXDO](https://linux.do)：真诚、友善、团结、专业的社区
 - [scrcpy](https://github.com/Genymobile/scrcpy)：ADB 画面采集与控制协议。
 - [MinHook](https://github.com/TsudaKageyu/minhook)、[nlohmann/json](https://github.com/nlohmann/json)、[FFmpeg](https://github.com/FFmpeg/FFmpeg)：挂接、配置解析和视频解码。
 - [uu-enhance](https://github.com/djkcyl/uu-enhance)、[better-gameviewer](https://github.com/std-microblock/better-gameviewer)：已有 UU 补丁的思路参考。
