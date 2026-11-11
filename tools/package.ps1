@@ -17,20 +17,17 @@ if (Test-Path -LiteralPath $destination) { throw '候选目录已存在，保留
 New-Item -ItemType Directory -Path $destination | Out-Null
 foreach ($name in @('version.dll','patch_load.exe','startup_check.exe')) { Copy-Item -LiteralPath (Join-Path $build $name) -Destination $destination }
 foreach ($name in @('config.example.json','THIRD_PARTY.md')) { Copy-Item -LiteralPath (Join-Path $root $name) -Destination $destination }
-Copy-Item -LiteralPath (Join-Path $root 'docs/部署使用说明.md') -Destination (Join-Path $destination 'README.md')
+Copy-Item -LiteralPath (Join-Path $root 'packaging/README.md') -Destination (Join-Path $destination 'README.md')
 Copy-Item -LiteralPath (Join-Path $root 'tools/install.ps1') -Destination (Join-Path $destination 'install.ps1')
-Copy-Item -LiteralPath (Join-Path $root 'docs') -Destination $destination -Recurse
 $licenses = Join-Path $destination 'licenses'
 New-Item -ItemType Directory -Path $licenses | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'third_party/minhook/LICENSE.txt') -Destination (Join-Path $licenses 'minhook.txt')
 Copy-Item -LiteralPath (Join-Path $root 'third_party/json/LICENSE.MIT') -Destination (Join-Path $licenses 'json.txt')
 Copy-Item -LiteralPath (Join-Path $root 'third_party/ffmpeg/COPYING.LGPLv2.1') -Destination (Join-Path $licenses 'ffmpeg.txt')
-& git @gitOptions archive --format=zip ('--output=' + (Join-Path $destination 'source.zip')) HEAD
-if ($LASTEXITCODE -ne 0) { throw '生成源码归档失败，保留当前目录。' }
 $entries = @(Get-ChildItem -LiteralPath $destination -File -Recurse | ForEach-Object {
     @{path=[IO.Path]::GetRelativePath($destination,$_.FullName).Replace('\','/'); sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 })
-@{revision=$revision; stage='persistent-candidate-host-restart-pending'; architecture='windows-x64'; host_version='4.46.0.4716'; files=$entries} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
+@{revision=$revision; source_url=('https://github.com/Rea1-ms/UU-Remote-Patch/tree/' + $revision); stage='persistent-candidate-host-restart-pending'; architecture='windows-x64'; host_version='4.46.0.4716'; files=$entries} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
 $archive = $destination + '.zip'
 Compress-Archive -LiteralPath $destination -DestinationPath $archive
 Write-Output $archive
