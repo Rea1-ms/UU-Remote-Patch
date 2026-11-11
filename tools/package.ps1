@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([string]$BuildDirectory = 'build/portable/Release')
+param([string]$BuildDirectory = 'build/dropin/Release')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $build = [IO.Path]::GetFullPath($BuildDirectory, $root)

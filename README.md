@@ -59,12 +59,12 @@ bin/
 需要 Visual Studio C++ x64 工具链和 CMake。下面以 Visual Studio 2026 为例：
 
 ```powershell
-cmake -S . -B build/portable -G "Visual Studio 18 2026" -A x64
-cmake --build build/portable --config Release
-ctest --test-dir build/portable -C Release --output-on-failure
+cmake -S . -B build/dropin -G "Visual Studio 18 2026" -A x64
+cmake --build build/dropin --config Release
+ctest --test-dir build/dropin -C Release --output-on-failure
 ```
 
-生成的补丁在 `build/portable/Release/version.dll`。提交源码后，用 PowerShell 7 运行 `./tools/package.ps1`，部署包生成在 `dist/`；包内只有 DLL、默认配置、简短说明和许可材料，不含开发文档、截图、注入工具或运行依赖。
+生成的补丁在 `build/dropin/Release/version.dll`。提交源码后，用 PowerShell 7 运行 `./tools/package.ps1`，部署包生成在 `dist/`；包内只有 DLL、默认配置、简短说明和许可材料，不含开发文档、截图、注入工具或运行依赖。
 
 ## 文档
 
