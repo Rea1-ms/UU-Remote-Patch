@@ -10,7 +10,7 @@
 
 ### 准备
 
-- Windows x64，UU 被控端 **4.46.0.4716**。目前只适配这一构建，补丁会核对官方文件，其他版本不会启用。
+- Windows x64，UU 被控端 **4.49.0.6162** 或 **4.46.0.4716**。补丁会核对官方文件，其他构建不会启用。
 - 下载[本项目的部署包](https://github.com/Rea1-ms/UU-Remote-Patch/releases/latest)，再下载 [scrcpy 5.0.1 Windows x64](https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1)。scrcpy 的依赖需要自己准备。
 - 设备开启 ADB 调试并完成授权；无线调试先完成配对。
 
@@ -88,17 +88,19 @@ JSON 路径建议使用 `/`。如果使用反斜杠，每个 `\` 都要写成 `\
 
 当前已在手机端确认上述主要功能。打开多开管理时，预览仍可能短暂退回占位图；多指和长期稳定性尚未验证。
 
+4.49.0.6162 的适配已重新定位后台入口；上面的手机实测来自 4.46.0.4716，新版仍待手机复测。升级补丁时退出后台、备份旧 DLL，再替换 `version.dll`；已有配置和依赖可以继续用。
+
 ## 构建
 
 需要 Visual Studio C++ x64 工具链和 CMake。下面以 Visual Studio 2026 为例：
 
 ```powershell
-cmake -S . -B build/dropin -G "Visual Studio 18 2026" -A x64
-cmake --build build/dropin --config Release
-ctest --test-dir build/dropin -C Release --output-on-failure
+cmake -S . -B build/host-4.49.0.6162 -G "Visual Studio 18 2026" -A x64
+cmake --build build/host-4.49.0.6162 --config Release
+ctest --test-dir build/host-4.49.0.6162 -C Release --output-on-failure
 ```
 
-生成的补丁在 `build/dropin/Release/version.dll`。提交源码后，用 PowerShell 7 运行 `./tools/package.ps1`，部署包生成在 `dist/`。
+生成的补丁在 `build/host-4.49.0.6162/Release/version.dll`。提交源码后，用 PowerShell 7 运行 `./tools/package.ps1`，部署包生成在 `dist/`。
 
 ## 文档
 

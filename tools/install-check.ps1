@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$HostDirectory = 'C:/Program Files/Netease/GameViewer/bin',
-    [string]$BuildDirectory = 'build/portable/Release',
+    [string]$BuildDirectory = 'build/host-4.49.0.6162/Release',
     [string]$ConfigFile = 'config.local.json'
 )
 $ErrorActionPreference = 'Stop'

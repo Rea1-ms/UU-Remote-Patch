@@ -254,13 +254,22 @@ static std::string hash(const fs::path& file) {
     constexpr char chars[]="0123456789abcdef";std::string out;
     for(auto b:digest){out+=chars[b>>4];out+=chars[b&15];}return out;
 }
-static void install_hooks() {
-    const auto bin=module_folder();
-    const std::pair<const wchar_t*,const char*> supported[]={
-        {L"GameViewerServer.exe","91cfe3bfc5582776a56a2cf6294c45afb7d65d68abe8c4a483e99a8549b00b5b"},
+struct HostBuild {const char* version;const char* server_hash;size_t instance_rva;};
+static const HostBuild& supported_host(const fs::path& bin) {
+    static constexpr HostBuild builds[]={
+        {"4.46.0.4716","91cfe3bfc5582776a56a2cf6294c45afb7d65d68abe8c4a483e99a8549b00b5b",0x4eef70},
+        {"4.49.0.6162","676f28fa7cbd8b2b916e05ae03b1d1cff91bab23a14ab172c37225a79b51ea7d",0x5038f0}};
+    const std::pair<const wchar_t*,const char*> libraries[]={
         {L"nrd_renderer_ipc.dll","d3960b8b14ec0020b89ccbc51f7414cdbfa67897aa5fa29b2014ed8e84e6aa1a"},
         {L"nemu-api.dll","40f44159d6fd637e2226a133508d032470e5caf22f35ef1065c86438fdd90abb"}};
-    for(auto& [name,expected]:supported)if(hash(bin/name)!=expected)throw std::runtime_error("unsupported host build; no hooks installed");
+    for(auto& [name,expected]:libraries)if(hash(bin/name)!=expected)throw std::runtime_error("unsupported host build; no hooks installed");
+    auto server_hash=hash(bin/L"GameViewerServer.exe");
+    for(auto& build:builds)if(server_hash==build.server_hash)return build;
+    throw std::runtime_error("unsupported host build; no hooks installed");
+}
+static void install_hooks() {
+    const auto bin=module_folder();
+    const auto& build=supported_host(bin);
     auto management=LoadLibraryW((bin/L"nemu-api.dll").c_str());
     auto nrd=GetModuleHandleW(L"nrd_renderer_ipc.dll");
     if(!management || !nrd)throw std::runtime_error("host modules unavailable");
@@ -277,7 +286,7 @@ static void install_hooks() {
     exported(management,"disconnectPlayer",disconnect_player,manager.disconnect);
     exported(management,"getPlayerLastLaunchError",last_error,manager.last_error);
     auto host=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
-    hook(host+0x4eef70,instance,original_instance);
+    hook(host+build.instance_rva,instance,original_instance);
     exported(nrd,"?nrd_set_callback@@YAXUnrd_callback@@@Z",set_callbacks,original_set);
     exported(nrd,"?nrd_ipc_create@@YAHPEBD@Z",create,original_create);
     exported(nrd,"?nrd_ipc_connect@@YAHH@Z",connect,original_connect);
@@ -288,9 +297,10 @@ static void install_hooks() {
     exported(nrd,"?nrd_system_operate@@YAHHPEBD0@Z",operate,original_operate);
     exported(nrd,"?nrd_screenshot@@YAHHHH@Z",screenshot,original_screenshot);
     if(MH_EnableHook(MH_ALL_HOOKS)!=MH_OK)throw std::runtime_error("hook activation failed");
-    log("hooks active for host 4.46.0.4716");
+    log(std::string("hooks active for host ")+build.version);
 }
 #ifdef UU_PATCH_CONTRACT_CHECK
+std::string check_host_build(const fs::path& bin) {return supported_host(bin).version;}
 static std::atomic<bool> check_callback_ok{true};
 static std::atomic<int> check_screenshots{0};
 static void check_system(int id,const char* name,const char* data) {

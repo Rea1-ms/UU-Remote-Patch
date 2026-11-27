@@ -9,13 +9,16 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'config.example.json')) { $PSScriptRoot } else { Split-Path $PSScriptRoot -Parent }
 $hostPath = [IO.Path]::GetFullPath($HostDirectory)
-if (!$BuildDirectory) { $BuildDirectory = if (Test-Path -LiteralPath (Join-Path $root 'version.dll')) { '.' } else { 'build/portable/Release' } }
+if (!$BuildDirectory) { $BuildDirectory = if (Test-Path -LiteralPath (Join-Path $root 'version.dll')) { '.' } else { 'build/host-4.49.0.6162/Release' } }
 $candidate = Join-Path ([IO.Path]::GetFullPath($BuildDirectory, $root)) 'version.dll'
 $installed = Join-Path $hostPath 'version.dll'
 $payload = Join-Path $hostPath 'uu-adb-patch'
 $receiptFile = Join-Path $payload 'install.json'
+$serverBuilds = @{
+    '91cfe3bfc5582776a56a2cf6294c45afb7d65d68abe8c4a483e99a8549b00b5b' = '4.46.0.4716'
+    '676f28fa7cbd8b2b916e05ae03b1d1cff91bab23a14ab172c37225a79b51ea7d' = '4.49.0.6162'
+}
 $expected = @{
-    'GameViewerServer.exe' = '91cfe3bfc5582776a56a2cf6294c45afb7d65d68abe8c4a483e99a8549b00b5b'
     'nrd_renderer_ipc.dll' = 'd3960b8b14ec0020b89ccbc51f7414cdbfa67897aa5fa29b2014ed8e84e6aa1a'
     'nemu-api.dll' = '40f44159d6fd637e2226a133508d032470e5caf22f35ef1065c86438fdd90abb'
 }
@@ -50,6 +53,10 @@ if ($Action -eq 'Disable') {
     return
 }
 $supported = $true
+$serverFile = Join-Path $hostPath 'GameViewerServer.exe'
+$serverMatches = (Test-Path -LiteralPath $serverFile) -and $serverBuilds.ContainsKey((Get-FileHash -LiteralPath $serverFile).Hash.ToLowerInvariant())
+[pscustomobject]@{ Component='GameViewerServer.exe'; MatchesSupportedBuild=$serverMatches }
+if (!$serverMatches) { $supported = $false }
 foreach ($name in ($expected.Keys | Sort-Object)) {
     $file = Join-Path $hostPath $name
     $matches = (Test-Path -LiteralPath $file) -and ((Get-FileHash -LiteralPath $file).Hash -eq $expected[$name])
